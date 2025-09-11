@@ -1,0 +1,10 @@
+{
+  "name": "beatblock-Editor",
+  "references": [
+    "beatblock"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": []
+}

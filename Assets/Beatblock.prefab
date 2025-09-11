@@ -21,6 +21,7 @@ GameObject:
   - component: {fileID: 4609489823588044}
   - component: {fileID: 212140907248312640}
   - component: {fileID: 114681668459771968}
+  - component: {fileID: 114969681902129620}
   m_Layer: 0
   m_Name: BG
   m_TagString: Untagged
@@ -161,6 +162,7 @@ GameObject:
   - component: {fileID: 4507694846251126}
   - component: {fileID: 212142589406200198}
   - component: {fileID: 114881011132806932}
+  - component: {fileID: 114762247111829458}
   m_Layer: 0
   m_Name: Overlay
   m_TagString: Untagged
@@ -783,6 +785,9 @@ MonoBehaviour:
   - {fileID: 102189175259871670}
   - {fileID: 102228332072587998}
   - {fileID: 102916209960783896}
+  HLClip: {fileID: 8300000, guid: 4256a5f3ba6a59d4f944a58829e32ed8, type: 3}
+  StrikeClip: {fileID: 8300000, guid: 443d28cd4b455be43b66f10d27f25984, type: 3}
+  SolveClip: {fileID: 8300000, guid: 2069fbad07493844ca88d83461796554, type: 3}
 --- !u!114 &114553443484999192
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -856,6 +861,19 @@ MonoBehaviour:
   AllowSelectionWrapY: 0
   ForceSelectionHighlight: 0
   ForceInteractionHighlight: 0
+--- !u!114 &114762247111829458
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1547842342846992}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1005838349, guid: 45b809be76fd7a3468b6f517bced6f28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShaderNames:
+  - Sprites/Default
 --- !u!114 &114876780815827414
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -942,7 +960,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   ShaderNames:
-  - KT/Mobile/Diffuse
+  - Unlit/Color
 --- !u!114 &114947872984060302
 MonoBehaviour:
   m_ObjectHideFlags: 1
@@ -967,6 +985,19 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   ShaderNames:
   - GUI/KT 3D Text
+--- !u!114 &114969681902129620
+MonoBehaviour:
+  m_ObjectHideFlags: 1
+  m_PrefabParentObject: {fileID: 0}
+  m_PrefabInternal: {fileID: 100100000}
+  m_GameObject: {fileID: 1001374859708324}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: -1005838349, guid: 45b809be76fd7a3468b6f517bced6f28, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  ShaderNames:
+  - Sprites/Default
 --- !u!114 &114980733697617166
 MonoBehaviour:
   m_ObjectHideFlags: 1

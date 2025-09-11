@@ -123,12 +123,16 @@ public class beatblock : MonoBehaviour
     [SerializeField] SpriteRenderer BGRenderer;
     [SerializeField] Sprite[] BGSprites;
     [SerializeField] TextMesh[] ChartInfo; // Song Name, Author, Charter
+    [SerializeField] AudioClip HLClip;
+    [SerializeField] AudioClip StrikeClip;
+    [SerializeField] AudioClip SolveClip;
 
     int GenChartCount = 8;
 
     int genChart;
     List<int> selectionCharts = new List<int>();
     int selectedChart = 0;
+    bool highlight;
 
     static int ModuleIdCounter = 1;
     int ModuleId;
@@ -137,16 +141,32 @@ public class beatblock : MonoBehaviour
     void Awake()
     {
         ModuleId = ModuleIdCounter++;
-        Overlay.OnHighlight += delegate () { OverlayRenderer.sprite = OverlaySprites[1]; };
-        Overlay.OnHighlightEnded += delegate () { OverlayRenderer.sprite = OverlaySprites[0]; };
+        Overlay.OnHighlight += delegate () { OverlayHighlight(); };
+        Overlay.OnHighlightEnded += delegate () { OverlayUnhighlight(); };
         BG.OnInteract += delegate () { CycleBG(); return false; };
         Overlay.OnInteract += delegate () { Submit(); return false; };
+    }
+
+    void OverlayHighlight()
+    {
+        OverlayRenderer.sprite = OverlaySprites[1];
+        if (!highlight)
+        {
+            Audio.PlaySoundAtTransform(HLClip.name, Overlay.transform);
+            highlight = true;
+        }
+    }
+
+    void OverlayUnhighlight()
+    {
+        OverlayRenderer.sprite = OverlaySprites[0];
+        highlight = false;
     }
 
     void CycleBG()
     {
         if (ModuleSolved) return;
-        Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, BG.transform);
+        Audio.PlaySoundAtTransform(HLClip.name, BG.transform);
         BG.AddInteractionPunch();
         selectedChart++;
         selectedChart %= GenChartCount;
@@ -156,17 +176,18 @@ public class beatblock : MonoBehaviour
     void Submit()
     {
         if (ModuleSolved) return;
-        Audio.PlayGameSoundAtTransform(KMSoundOverride.SoundEffect.ButtonPress, BG.transform);
         Overlay.AddInteractionPunch();
         if (selectionCharts[selectedChart] == genChart)
         {
             Log($"Submitted {LogChartName(selectionCharts[selectedChart])}, which is correct. Module Solved!");
+            Audio.PlaySoundAtTransform(SolveClip.name, BG.transform);
             ModuleSolved = true;
             GetComponent<KMBombModule>().HandlePass();
         }
         else
         {
             Log($"Submitted {LogChartName(selectionCharts[selectedChart])}, which is incorrect. Strike! Regenerating the module...");
+            Audio.PlaySoundAtTransform(StrikeClip.name, BG.transform);
             GetComponent<KMBombModule>().HandleStrike();
             Generate();
         }
