@@ -6,13 +6,14 @@ using System.Text.RegularExpressions;
 using UnityEngine;
 using KModkit;
 using Rnd = UnityEngine.Random;
+using UnityEngine.UI;
 
 public class beatblock : MonoBehaviour
 {
     [SerializeField] private KMBombInfo Bomb;
     [SerializeField] private KMAudio Audio;
 
-    string[,] Charts = new string[155, 3]
+    string[,] Charts =
     {
         { "La Di Da (Nightcore &\nCut Ver.)", "Baracuda", "Piger" },
         { "Cold Green Eyes", "Station Earth (ft. Roos Denayer)", "_Play_" },
@@ -170,6 +171,8 @@ public class beatblock : MonoBehaviour
         { "A World on Fire", "Bo Burnham", "DPS2004" },
         { "Beyond", "philmakesnoise", "Kirbo" },
     };
+    string[] NoteNames = { "Block", "Hold", "Side", "Mine", "Minehold", "Bounce" };
+    string[] PaddleModeNames = { "Regular", "No Paddle", "360° Paddle" };
 
     [SerializeField] KMSelectable Overlay;
     [SerializeField] SpriteRenderer OverlayRenderer;
@@ -178,16 +181,41 @@ public class beatblock : MonoBehaviour
     [SerializeField] SpriteRenderer BGRenderer;
     [SerializeField] Sprite[] BGSprites;
     [SerializeField] TextMesh[] ChartInfo; // Song Name, Artist, Charter
+    [SerializeField] Slider BeatSlider;
+    [SerializeField] TextMesh BeatText;
+    [SerializeField] KMSelectable[] KeypadButtons; // 0123456789.<
+    [SerializeField] KMSelectable ShowResults;
+    [SerializeField] TextMesh AccuracyText;
+    [SerializeField] SpriteRenderer[] NoteRenderers;
+    [SerializeField] TextMesh[] NoteDurations;
+    [SerializeField] Sprite[] NoteSprites; // Block, Hold, Side, Mine, Minehold, Bounce
+    [SerializeField] SpriteRenderer PaddleRenderer;
+    [SerializeField] Sprite[] PaddleModeSprites; // Regular (None), No Paddle, 360° Paddle
+    [SerializeField] GameObject Stage1;
+    [SerializeField] GameObject Stage2;
     [SerializeField] AudioClip HLClip;
     [SerializeField] AudioClip StrikeClip;
-    [SerializeField] AudioClip SolveClip;
+    [SerializeField] AudioClip CorrectClip;
 
     int GenChartCount = 8;
+    int MinEndBeat = 10;
+    int MaxEndBeat = 8;
+    List<int> WeightedNoteCounts = new List<int> { 1, 1, 1, 2, 2, 2, 2, 2, 3, 3 };
+    List<int> WeightedNoteTypes = new List<int> { 0, 0, 0, 0, 1, 1, 1, 2, 2, 2, 3, 3, 3, 3, 4, 5, 5 };
+    List<int> WeightedPaddleModes = new List<int> { 0, 0, 0, 0, 0, 1, 1, 2, 2 };
 
     int genChart;
     List<int> selectionCharts = new List<int>();
     int selectedChart = 0;
     bool highlightBG, highlightPlay;
+
+    int beats;
+    List<string[]> chart = new List<string[]>();
+    List<int> paddleModes = new List<int>();
+    int fullCombo, misses = 0;
+    string answerAccuracy;
+    int sliderBeat;
+    string accuracyInput = "";
 
     static int ModuleIdCounter = 1;
     int ModuleId;
@@ -202,6 +230,12 @@ public class beatblock : MonoBehaviour
         BG.OnInteract += delegate () { CycleBG(); return false; };
         BG.OnHighlight += delegate () { HighlightBG(); };
         BG.OnHighlightEnded += delegate () { highlightBG = false; };
+        ShowResults.OnInteract += delegate () { SubmitAccuracy(); return false; };
+        for (int i = 0; i < KeypadButtons.Length; i++)
+        {
+            int j = i;
+            KeypadButtons[i].OnInteract += delegate () { KeypadPress(j); return false; };
+        }
     }
 
     void HighlightPlay()
@@ -224,7 +258,6 @@ public class beatblock : MonoBehaviour
 
     void CycleBG()
     {
-        if (ModuleSolved) return;
         Audio.PlaySoundAtTransform(HLClip.name, BG.transform);
         BG.AddInteractionPunch();
         selectedChart++;
@@ -234,30 +267,98 @@ public class beatblock : MonoBehaviour
 
     void Submit()
     {
-        if (ModuleSolved) return;
         Overlay.AddInteractionPunch();
         if (selectionCharts[selectedChart] == genChart)
         {
-            Log($"Submitted {LogChartName(selectionCharts[selectedChart])}, which is correct. Module Solved!");
-            Audio.PlaySoundAtTransform(SolveClip.name, BG.transform);
-            ModuleSolved = true;
-            GetComponent<KMBombModule>().HandlePass();
+            Log($"Submitted {LogChartName(selectionCharts[selectedChart])}, which is correct. Off to Stage 2...");
+            Audio.PlaySoundAtTransform(CorrectClip.name, BG.transform);
+            Stage1.SetActive(false);
+            Stage2.SetActive(true);
+            GenerateS2();
         }
         else
         {
             Log($"Submitted {LogChartName(selectionCharts[selectedChart])}, which is incorrect. Strike! Regenerating the module...");
             Audio.PlaySoundAtTransform(StrikeClip.name, BG.transform);
             GetComponent<KMBombModule>().HandleStrike();
-            Generate();
+            GenerateS1();
+        }
+    }
+
+    public void SliderValChange()
+    {
+        sliderBeat = (int)BeatSlider.value;
+        BeatText.text = sliderBeat.ToString() + ".000";
+        for (int n = 0; n < 3; n++)
+        {
+            string note = chart[sliderBeat][n];
+            if (note == null)
+            {
+                NoteRenderers[n].sprite = null;
+                NoteDurations[n].text = "";
+            }
+            else
+            {
+                if (note.Contains(" "))
+                {
+                    int space = note.IndexOf(" ");
+                    NoteRenderers[n].sprite = NoteSprites[NoteNames.IndexOf(x => x == note.Substring(0, space))];
+                    NoteDurations[n].text = note.Substring(space + 1);
+                }
+                else
+                {
+                    NoteRenderers[n].sprite = NoteSprites[NoteNames.IndexOf(x => x == note)];
+                    NoteDurations[n].text = "";
+                }
+            }
+        }
+        PaddleRenderer.sprite = PaddleModeSprites[paddleModes[sliderBeat]];
+    }
+
+    void KeypadPress(int n)
+    {
+        if (ModuleSolved) return;
+        Audio.PlaySoundAtTransform(HLClip.name, BG.transform);
+        if (n == 10) accuracyInput += ".";
+        else if (n < 10) accuracyInput += n.ToString();
+        else
+        {
+            if (accuracyInput.Length == 0) return;
+            else accuracyInput = accuracyInput.Substring(0, accuracyInput.Length - 1);
+        }
+        if (accuracyInput.Length > 6) accuracyInput = accuracyInput.Substring(0, accuracyInput.Length - 1);
+        AccuracyText.text = accuracyInput;
+    }
+
+    void SubmitAccuracy()
+    {
+        if (ModuleSolved) return;
+        Overlay.AddInteractionPunch();
+        string submission = accuracyInput.Length == 0 ? "an empty string" : (accuracyInput + "%");
+        if (accuracyInput == answerAccuracy)
+        {
+            Log($"Submitted {submission}, which is correct. Module solved! ^^");
+            Audio.PlaySoundAtTransform(CorrectClip.name, BG.transform);
+            GetComponent<KMBombModule>().HandlePass();
+            ModuleSolved = true;
+            if (accuracyInput.Length > 0) AccuracyText.text += "%";
+        }
+        else
+        {
+            Log($"Submitted {submission}, which is incorrect. Strike!");
+            Audio.PlaySoundAtTransform(StrikeClip.name, BG.transform);
+            GetComponent<KMBombModule>().HandleStrike();
+            accuracyInput = "";
         }
     }
 
     void Start()
     {
-        Generate();
+        Stage2.SetActive(false);
+        GenerateS1();
     }
 
-    void Generate()
+    void GenerateS1()
     {
         genChart = Rnd.Range(0, Charts.Length / 3);
         for (int i = 0; i < 3; i++) ChartInfo[i].text = Charts[genChart, i];
@@ -273,10 +374,118 @@ public class beatblock : MonoBehaviour
             selectionCharts.Add(addChart);
         }
         selectionCharts = selectionCharts.Shuffle();
+        while (selectionCharts[0] == genChart) selectionCharts = selectionCharts.Shuffle();
         BGRenderer.sprite = BGSprites[selectionCharts[0]];
         selectedChart = 0;
         Log($"Answer chart - {LogChartName(genChart)}.");
         Log($"Selectable charts, in order - {selectionCharts.Select(x => LogChartName(x)).Join(", ")}.");
+    }
+
+    void GenerateS2()
+    {
+        beats = Rnd.Range(MinEndBeat, MaxEndBeat + 1);
+        BeatSlider.maxValue = beats - 1;
+        Log($"Generating the module's {beats}-beat chart:");
+        for (int i = 0; i < beats; i++)
+        {
+            string[] beat = new string[3];
+            List<string> logBeat = new List<string>();
+            int notes = WeightedNoteCounts.PickRandom();
+            for (int j = 0; j < notes; j++)
+            {
+                int noteType = WeightedNoteTypes.PickRandom();
+                if (i == beats - 1)
+                {
+                    while (noteType == 1 || noteType == 4 || noteType == 5) noteType = WeightedNoteTypes.PickRandom();
+                }
+                int duration = -1;
+                if (noteType == 1 || noteType == 4 || noteType == 5) duration = Rnd.Range(1, Math.Min(5, beats - i - 1));
+                beat[j] = NoteNames[noteType] + (duration > 0 ? $" {duration}" : "");
+                logBeat.Add(duration > 0 ? $"{NoteNames[noteType]} (duration = {duration})" : NoteNames[noteType]);
+            }
+            chart.Add(beat);
+
+            int paddle = WeightedPaddleModes.PickRandom();
+            paddleModes.Add(paddle);
+
+            Log($"Beat {i}.000: {logBeat.Join(", ")}. Paddle Mode - {PaddleModeNames[paddle]}.");
+        }
+        CalculateS2();
+        SliderValChange();
+    }
+
+    void CalculateS2()
+    {
+        bool[] minePresent = new bool[beats];
+        bool[] mineHoldEnd = new bool[beats];
+        for (int b = 0; b < beats; b++)
+        {
+            for (int n = 0; n < 3; n++)
+            {
+                string note = chart[b][n];
+                if (note == null) continue;
+                int duration = -1;
+                if (note.Contains(" "))
+                {
+                    int space = note.IndexOf(" ");
+                    duration = int.Parse(note.Substring(space + 1));
+                    note = note.Substring(0, space);
+                }
+                switch (note)
+                {
+                    case "Block":
+                        if (paddleModes[b] == 1) misses++;
+                        fullCombo++;
+                        break;
+                    case "Hold":
+                        if (paddleModes[b] == 1) misses += 2;
+                        else
+                        {
+                            for (int bi = b; bi < (b + duration + 1); bi++)
+                            {
+                                if (paddleModes[bi] == 1)
+                                {
+                                    misses++;
+                                    break;
+                                }
+                            }
+                        }
+                        fullCombo += 2;
+                        break;
+                    case "Side":
+                        if (paddleModes[b] != 0) misses++;
+                        fullCombo++;
+                        break;
+                    case "Mine":
+                        if (paddleModes[b] == 2) misses++;
+                        minePresent[b] = true;
+                        break;
+                    case "Minehold":
+                        for (int bi = b; bi < (b + duration + 1); bi++) if (paddleModes[bi] == 2) misses++;
+                        mineHoldEnd[b + duration] = true;
+                        break;
+                    case "Bounce":
+                        for (int bi = b; bi < (b + duration + 1); bi++) if (paddleModes[bi] == 1) misses++;
+                        fullCombo += duration + 1;
+                        break;
+                    default:
+                        break;
+                }
+            }
+        }
+        fullCombo += minePresent.Count(x => x) + mineHoldEnd.Count(x => x);
+
+        float accuracy = (float)Math.Floor((double)(fullCombo - misses) / fullCombo * 10000) / 100;
+        if (accuracy >= 0)
+        {
+            answerAccuracy = accuracy.ToString("F2");
+            Log($"After processing all the notes, Full Combo = {fullCombo}, Misses = {misses}, which makes the answer {answerAccuracy}%");
+        }
+        else
+        {
+            answerAccuracy = "";
+            Log($"After processing all the notes, Full Combo = {fullCombo}, Misses = {misses}, which would've made the answer ~{accuracy.ToString("F2")}%, which is a negative number - submit an empty string instead.");
+        }
     }
 
     string LogChartName(int n)
