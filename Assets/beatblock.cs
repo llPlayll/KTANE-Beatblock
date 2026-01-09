@@ -139,7 +139,6 @@ public class beatblock : MonoBehaviour
         { "Charlie's Absolution", "Flecha Da Foxy", "Random22" },
         { "Daydream", "Cloudier", "PGO6973" },
         { "Im From Another\nDimension", "Brad Breeck", "Piger" },
-        { "Flamewall", "Camellia", "bliss" },
         { "BANANA BUS\nBREAKDOWN", "fearless.", "skit.png" },
         { "DRAGONLADY", "Nankumo", "_Play_" },
         { "Limbus Company X Arknights\nCollab - Intervallo VI-EX Boss\nTheme 2", "Studio EIM", "Flareiozum" },
